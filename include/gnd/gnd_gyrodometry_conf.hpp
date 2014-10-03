@@ -79,11 +79,13 @@ namespace gnd {
 				"offset calibration start after this time from robot stopped"
 		};
 
-		static const param_bool_t Default_status_display = {
-				"cui-status-display",
-				false,
-				"display the node status in terminal. [note] it need ansi color code"
+		static const param_double_t Default_cycle_cui_status_display = {
+				"cycle-cui-status-display",
+				0,
+				"cycle to display the node status in standard output [msec]. [note] it need ansi color code. [note] if this value is less than or equal 0, don't display"
 		};
+		// ---> debug condition
+
 
 		static const param_string_t Default_gyrodometry_log = {
 				"gyrodometry-log",
@@ -164,7 +166,7 @@ namespace gnd {
 
 			// debug option
 			param_string_t	gyrodometry_log;					///< gyrodometory topic name
-			param_bool_t	status_display;						///< cui status display mode
+			param_double_t	cycle_cui_status_display;			///< cui status display mode
 		};
 
 		inline
@@ -201,7 +203,7 @@ namespace gnd {
 			memcpy( &p->offset_calibration_time_margin,	&Default_offset_calibration_time_margin,	sizeof(Default_offset_calibration_time_margin) );
 			// debug option
 			memcpy( &p->gyrodometry_log,				&Default_gyrodometry_log,					sizeof(Default_gyrodometry_log) );
-			memcpy( &p->status_display,					&Default_status_display,					sizeof(Default_status_display) );
+			memcpy( &p->cycle_cui_status_display,		&Default_cycle_cui_status_display,			sizeof(Default_cycle_cui_status_display) );
 
 			return 0;
 		}
@@ -247,7 +249,7 @@ namespace gnd {
 			gnd::conf::get_parameter( src, &dest->offset_calibration_time_margin );
 			// debug option
 			gnd::conf::get_parameter( src, &dest->gyrodometry_log );
-			gnd::conf::get_parameter( src, &dest->status_display );
+			gnd::conf::get_parameter( src, &dest->cycle_cui_status_display );
 			return 0;
 		}
 
@@ -294,7 +296,7 @@ namespace gnd {
 			gnd::conf::set_parameter(dest, &src->offset_calibration_time_margin );
 			// debug option
 			gnd::conf::set_parameter(dest, &src->gyrodometry_log );
-			gnd::conf::set_parameter(dest, &src->status_display );
+			gnd::conf::set_parameter(dest, &src->cycle_cui_status_display );
 
 			return 0;
 		}

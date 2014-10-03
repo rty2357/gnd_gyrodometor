@@ -12,7 +12,7 @@
 #include "gnd/gnd_gyrodometry_conf.hpp"
 
 #include "gnd_geometry2d_msgs/msg_pose2d_stamped.h"
-#include "gnd_geometry2d_msgs/msg_velocity2d_stamped.h"
+#include "gnd_geometry2d_msgs/msg_velocity2d_with_covariance_stamped.h"
 
 #include "vectornav/sensors.h"
 
@@ -24,11 +24,11 @@
 
 #include "ros/ros.h"
 
-typedef gnd_geometry2d_msgs::msg_pose2d_stamped				msg_pose2d_t;
-typedef gnd_geometry2d_msgs::msg_velocity2d_stamped			msg_vel2d_t;
-typedef vectornav::sensors									msg_imu_t;
-typedef gnd::rosutil::rosmsgs_reader_stamped<msg_vel2d_t>	msgreader_vel2d_t;
-typedef gnd::rosutil::rosmsgs_reader_stamped<msg_imu_t>		msgreader_imu_t;
+typedef gnd_geometry2d_msgs::msg_pose2d_stamped							msg_pose2d_t;
+typedef gnd_geometry2d_msgs::msg_velocity2d_with_covariance_stamped		msg_vel2d_t;
+typedef vectornav::sensors												msg_imu_t;
+typedef gnd::rosutil::rosmsgs_reader_stamped<msg_vel2d_t>				msgreader_vel2d_t;
+typedef gnd::rosutil::rosmsgs_reader_stamped<msg_imu_t>					msgreader_imu_t;
 
 int main(int argc, char *argv[]) {
 	gnd::gyrodometry::node_config			node_config;
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 				return -1;
 			}
 			else {
-				fprintf(stdout, "   ... read config file \"%s\"\n", argv[1]);
+				fprintf(stdout, "   ... ok, read config file \"%s\"\n", argv[1]);
 			}
 		}
 	} // <--- read configuration
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
 		// ---> initialize imu subscriber
 		if( ros::ok() ) {
 			fprintf(stdout, "\n");
-			fprintf(stdout, " => %d. make imu publisher\n", ++phase);
+			fprintf(stdout, " => %d. make imu subscriber\n", ++phase);
 			if( !node_config.topic_name_vel2d.value[0] ) {
 				fprintf(stdout, "   ... Error: imu topic name is null, you needs to specify the name via config item \"%s\"\n", node_config.topic_name_imu.item);
 				ros::shutdown();
@@ -183,22 +183,24 @@ int main(int argc, char *argv[]) {
 
 	// ---> operation
 	if( ros::ok() ) {
+		// gyrodometry variables
+		uint32_t seq_imu_prevoffsetupdate = 0;
+		int cnt_odom_nonvel2d = 0;
 		double offset_rate;
 		double time_latestvel2d = 0;
-		double time_latestimu = 0;
 
+		// main loop manage object
+		ros::Rate loop_rate(1000);
+		ros::AsyncSpinner spinner(2);
+
+		// timer valiables
 		double time_start;
 		double time_vehiclestop;
 		double time_current;
 		double time_gyrodom;
 		double time_display;
 
-		const double cycle_display = gnd_sec2time(1.0);
-
-		double diff_time = 0;
-
-		ros::Rate loop_rate(1000);
-
+		// display variables
 		uint32_t seq_gyrodo_prevdisp = msg_gyrodo.header.seq;
 		uint32_t seq_vel2d_prevdisp = msg_vel2d.header.seq;
 		uint32_t seq_imu_prevdisp = msg_imu.header.seq;
@@ -217,11 +219,10 @@ int main(int argc, char *argv[]) {
 		} // <--- time initialize
 
 		// ---> main loop
+		spinner.start();
 		while( ros::ok() ){
 			// sleep
 			loop_rate.sleep();
-			// subscribe
-			ros::spinOnce();
 
 			// save time
 			time_current = ros::Time::now().toSec();
@@ -229,15 +230,16 @@ int main(int argc, char *argv[]) {
 			// ---> calculate 2d pose
 			if( time_current > time_gyrodom ) {
 				// get velocity2d massage
-				if( msgreader_vel2d.copy_next( &msg_vel2d, msg_vel2d.header.seq) < 0) {
+				if( msgreader_vel2d.copy_next( &msg_vel2d, msg_vel2d.header.seq) != 0) {
 					// no data
 				}
 				else {
 					time_latestvel2d = time_current;
+					cnt_odom_nonvel2d = 0;
 				}
 
 				// get imu massage
-				if( msgreader_imu.copy_at_time( &msg_imu, msg_vel2d.header.stamp.toSec() ) < 0) {
+				if( msgreader_imu.copy_at_time( &msg_imu, msg_vel2d.header.stamp.toSec() ) != 0) {
 					// no data
 				}
 				// ---> pose calculation
@@ -255,10 +257,19 @@ int main(int argc, char *argv[]) {
 						msg_imu_t ws;
 
 						if( time_current - time_vehiclestop > node_config.offset_calibration_time_margin.value * 2.0
-								&& msgreader_imu.copy_at_time(&ws, time_current - node_config.offset_calibration_time_margin.value) == 0 ) {
+								&& msgreader_imu.copy_at_time(&ws, msg_imu.header.stamp.toSec() - node_config.offset_calibration_time_margin.value) == 0 ) {
 							// update offset
-							offset_rate += ( (-ws.Gyro.z) - offset_rate) * node_config.offset_calibration_factor.value;
+							if( ws.header.seq == seq_imu_prevoffsetupdate) {
+								// not a new data
+							}
+							else {
+								offset_rate += ( (-ws.Gyro.z) - offset_rate) * node_config.offset_calibration_factor.value;
+								seq_imu_prevoffsetupdate = ws.header.seq;
+							}
 							rate = 0;
+						}
+						else {
+							rate = (-msg_imu.Gyro.z) - offset_rate;
 						}
 					}
 					// moving
@@ -269,13 +280,14 @@ int main(int argc, char *argv[]) {
 
 					// calculate robot direction
 					msg_gyrodo.header.seq++;
-					msg_gyrodo.header.stamp = msg_vel2d.header.stamp;
+					msg_gyrodo.header.stamp.fromSec( msg_vel2d.header.stamp.toSec() + cnt_odom_nonvel2d * node_config.cycle.value );
 					msg_gyrodo.x += (msg_vel2d.vel_x * cosv - msg_vel2d.vel_y * sinv) * node_config.cycle.value;
 					msg_gyrodo.y += (msg_vel2d.vel_x * sinv + msg_vel2d.vel_y * cosv) * node_config.cycle.value;
 					msg_gyrodo.theta += rate * node_config.cycle.value;
 
 					// publish
 					pub_gyrodo.publish(msg_gyrodo);
+					cnt_odom_nonvel2d++;
 
 					if( fp_textlog ) {
 						fprintf(fp_textlog, "%lf %lf %lf %lf %lf\n", time_current - time_start, msg_gyrodo.x, msg_gyrodo.y, msg_gyrodo.theta, offset_rate );
@@ -283,12 +295,13 @@ int main(int argc, char *argv[]) {
 
 					// update period
 					time_gyrodom = gnd_loop_next(time_current, time_start, node_config.cycle.value);
+
 				} // <--- pose calculation
 			}
 			// <--- calculate 2d pose
 
 			// ---> show status
-			if( node_config.status_display.value && time_current > time_display ) {
+			if( node_config.cycle_cui_status_display.value > 0 && time_current > time_display ) {
 				msg_imu_t ws;
 
 				if( nline_display ) {
@@ -299,36 +312,39 @@ int main(int argc, char *argv[]) {
 				nline_display++; ::fprintf(stderr, "\x1b[K-------------------- \x1b[1m\x1b[36m%s\x1b[39m\x1b[0m --------------------\n", node_config.node_name.value);
 				nline_display++; ::fprintf(stderr, "\x1b[K operating time : %6.01lf[sec]\n", time_current - time_start);
 				// position (publish)
-				nline_display++; ::fprintf(stderr, "\x1b[K      position  :   topic name \"%s\" (publish)\n", node_config.topic_name_gyrodom.value);
+				nline_display++; ::fprintf(stderr, "\x1b[K       position :   topic name \"%s\" (publish)\n", node_config.topic_name_gyrodom.value);
 				nline_display++; ::fprintf(stderr, "\x1b[K                :        value %8.03lf[m], %8.03lf[m], %6.01lf[deg]\n",
 						msg_gyrodo.x, msg_gyrodo.y, gnd_ang2deg( msg_gyrodo.theta ) );
-				nline_display++; ::fprintf(stderr, "\x1b[K                :     pub rate %lf\n",
-						(double) (msg_gyrodo.header.seq - seq_gyrodo_prevdisp) / cycle_display);
+				nline_display++; ::fprintf(stderr, "\x1b[K                :      publish %.01lf [Hz]\n",
+						(double) (msg_gyrodo.header.seq - seq_gyrodo_prevdisp) / node_config.cycle_cui_status_display.value );
 				seq_gyrodo_prevdisp = msg_gyrodo.header.seq;
 				// velocity (subscribe)
-				nline_display++; ::fprintf(stderr, "\x1b[K  velocity (2D) :   topic name \"%s\" (subscribe)\n", node_config.topic_name_vel2d.value);
+				nline_display++; ::fprintf(stderr, "\x1b[K       velocity :   topic name \"%s\" (subscribe)\n", node_config.topic_name_vel2d.value);
 				nline_display++; ::fprintf(stderr, "\x1b[K                :        value %5.02lf[m/s], %4.02lf[m/s], %4.01lf[deg/s]\n",
 						msg_vel2d.vel_x, msg_vel2d.vel_y, gnd_ang2deg( msg_vel2d.vel_ang ) );
-				nline_display++; ::fprintf(stderr, "\x1b[K                :   subsc rate %lf\n",
-						(double) (msg_vel2d.header.seq - seq_vel2d_prevdisp) / cycle_display);
+				nline_display++; ::fprintf(stderr, "\x1b[K                :    subscribe %.01lf [Hz]\n",
+						(double) (msg_vel2d.header.seq - seq_vel2d_prevdisp) / node_config.cycle_cui_status_display.value );
 				seq_vel2d_prevdisp = msg_vel2d.header.seq;
 				// imu (subscribe)
 				msgreader_imu.copy_latest(&ws);
 				nline_display++; ::fprintf(stderr, "\x1b[K    gyro sensor :   topic name \"%s\" (subscribe)\n", node_config.topic_name_imu.value);
 				nline_display++; ::fprintf(stderr, "\x1b[K                :     yaw rate %4.01lf[deg/s], offset corrected %4.01lf[deg/s]\n", gnd_ang2deg( -ws.Gyro.z ),  gnd_ang2deg( -ws.Gyro.z - offset_rate ) );
-				nline_display++; ::fprintf(stderr, "\x1b[K                :   subsc rate %lf\n",
-						(double) (ws.header.seq - seq_imu_prevdisp) / cycle_display);
+				nline_display++; ::fprintf(stderr, "\x1b[K                :    subscribe %.01lf [Hz]\n",
+						(double) (ws.header.seq - seq_imu_prevdisp) / node_config.cycle_cui_status_display.value );
 				seq_imu_prevdisp = ws.header.seq;
-				nline_display++; ::fprintf(stderr, "\x1b[K                :  rate offset %6.04lf[deg/s]\n", gnd_ang2deg( offset_rate ) );
+				nline_display++; ::fprintf(stderr, "\x1b[K                :  rate offset %6.04lf\n", offset_rate );
+				// data association
+				nline_display++; ::fprintf(stderr, "\x1b[K data associate :   stamp diff %7.04lf [sec] (velocity - gyro sensor)\n", msg_vel2d.header.stamp.toSec() - msg_imu.header.stamp.toSec() );
 
 				nline_display++; ::fprintf(stderr, "\x1b[K\n");
 
 				// update
-				time_display = gnd_loop_next(time_current, time_start, cycle_display);
+				time_display = gnd_loop_next(time_current, time_start, node_config.cycle_cui_status_display.value );
 
 			} // <--- show status
 
 		} // <--- main loop
+		spinner.stop();
 
 	} // <--- operation
 
