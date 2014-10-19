@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(gnd_gyrodometry)
+project(gnd_gyrodometor)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -59,7 +59,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-#  LIBRARIES gnd_gyrodometry
+#  LIBRARIES gnd_gyrodometor
    CATKIN_DEPENDS roscpp std_msgs geometry_msgs vectornav gnd_rosutil
 #  DEPENDS system_lib
 )
@@ -76,19 +76,19 @@ include_directories(
 )
 
 ## Declare a cpp library
-#add_library(gnd_gyrodometry
-#  STATIC src/gnd_gyrodometry.c
+#add_library(gnd_gyrodometor
+#  STATIC src/gnd_gyrodometor.c
 #)
 
 ## Declare a cpp executable
-add_executable(gnd_gyrodometry     src/gnd_gyrodometry.cpp )
+add_executable(gnd_gyrodometor     src/gnd_gyrodometor.cpp )
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(vectornav_node vectornav_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(gnd_gyrodometry
+target_link_libraries(gnd_gyrodometor
   ${catkin_LIBRARIES}
 )
 
@@ -107,7 +107,7 @@ target_link_libraries(gnd_gyrodometry
 #)
 
 ## Mark executables and/or libraries for installation
-install(TARGETS gnd_gyrodometry
+install(TARGETS gnd_gyrodometor
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

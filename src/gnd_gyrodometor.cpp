@@ -8,8 +8,8 @@
 
 #include <stdio.h>
 
-#include "gnd/gnd_gyrodometry.hpp"
-#include "gnd/gnd_gyrodometry_conf.hpp"
+#include "gnd/gnd_gyrodometor.hpp"
+#include "gnd/gnd_gyrodometor_conf.hpp"
 
 #include "gnd_geometry2d_msgs/msg_pose2d_stamped.h"
 #include "gnd_geometry2d_msgs/msg_velocity2d_with_covariance_stamped.h"
@@ -31,16 +31,16 @@ typedef gnd::rosutil::rosmsgs_reader_stamped<msg_vel2d_t>				msgreader_vel2d_t;
 typedef gnd::rosutil::rosmsgs_reader_stamped<msg_imu_t>					msgreader_imu_t;
 
 int main(int argc, char *argv[]) {
-	gnd::gyrodometry::node_config			node_config;
+	gnd::gyrodometor::node_config			node_config;
 	{ // ---> read configuration
 		if( argc > 1 ) {
 			fprintf(stdout, " => read configuration file\n");
-			if( gnd::gyrodometry::fread_node_config( argv[1], &node_config ) < 0 ){
+			if( gnd::gyrodometor::fread_node_config( argv[1], &node_config ) < 0 ){
 				char fname[1024];
 				fprintf(stdout, "   ... Error: fail to read configuration file \"%s\"\n", argv[1]);
 				sprintf(fname, "%s.tmp", argv[1]);
 				// file out configuration file
-				if( gnd::gyrodometry::fwrite_node_config( fname, &node_config ) >= 0 ){
+				if( gnd::gyrodometor::fwrite_node_config( fname, &node_config ) >= 0 ){
 					fprintf(stdout, "            : output sample configuration file \"%s\"\n", fname);
 				}
 				return -1;
@@ -185,13 +185,11 @@ int main(int argc, char *argv[]) {
 	if( ros::ok() ) {
 		// gyrodometry variables
 		uint32_t seq_imu_prevoffsetupdate = 0;
-		int cnt_odom_nonvel2d = 0;
 		double offset_rate;
 		double time_latestvel2d = 0;
 
 		// main loop manage object
 		ros::Rate loop_rate(1000);
-		ros::AsyncSpinner spinner(2);
 
 		// timer valiables
 		double time_start;
@@ -219,31 +217,20 @@ int main(int argc, char *argv[]) {
 		} // <--- time initialize
 
 		// ---> main loop
-		spinner.start();
+		fprintf(stderr, "   => %s main loop start\n", node_config.node_name.value);
 		while( ros::ok() ){
 			// sleep
 			loop_rate.sleep();
+			ros::spinOnce();
 
 			// save time
 			time_current = ros::Time::now().toSec();
 
-			// ---> calculate 2d pose
-			if( time_current > time_gyrodom ) {
-				// get velocity2d massage
-				if( msgreader_vel2d.copy_next( &msg_vel2d, msg_vel2d.header.seq) != 0) {
-					// no data
-				}
-				else {
-					time_latestvel2d = time_current;
-					cnt_odom_nonvel2d = 0;
-				}
+			// ---> read velocity data
+			if( msgreader_vel2d.is_updated( msg_vel2d.header.seq ) ){							// no new data
+				msgreader_vel2d.copy_next( &msg_vel2d, msg_vel2d.header.seq);
 
-				// get imu massage
-				if( msgreader_imu.copy_at_time( &msg_imu, msg_vel2d.header.stamp.toSec() ) != 0) {
-					// no data
-				}
-				// ---> pose calculation
-				else if( time_current - time_latestvel2d < 0.3  ) {
+				if( msgreader_imu.copy_at_time( &msg_imu, msg_vel2d.header.stamp.toSec() ) == 0) {
 					double cosv, sinv;
 					double rate;
 
@@ -256,10 +243,10 @@ int main(int argc, char *argv[]) {
 							fabs(msg_imu.Gyro.z - offset_rate) < gnd_deg2ang(2.0) ) {
 						msg_imu_t ws;
 
-						if( time_current - time_vehiclestop > node_config.offset_calibration_time_margin.value * 2.0
-								&& msgreader_imu.copy_at_time(&ws, msg_imu.header.stamp.toSec() - node_config.offset_calibration_time_margin.value) == 0 ) {
+						if( msg_vel2d.header.stamp.toSec() - time_vehiclestop > node_config.offset_calibration_time_margin.value * 2.0
+								&& msgreader_imu.copy_at_time(&ws, msg_vel2d.header.stamp.toSec() - node_config.offset_calibration_time_margin.value) == 0 ) {
 							// update offset
-							if( ws.header.seq == seq_imu_prevoffsetupdate) {
+							if( ws.header.seq <= seq_imu_prevoffsetupdate) {
 								// not a new data
 							}
 							else {
@@ -274,34 +261,35 @@ int main(int argc, char *argv[]) {
 					}
 					// moving
 					else {
-						time_vehiclestop = time_current;
+						time_vehiclestop = msg_vel2d.header.stamp.toSec();
 						rate = (-msg_imu.Gyro.z) - offset_rate;
 					}
 
 					// calculate robot direction
 					msg_gyrodo.header.seq++;
-					msg_gyrodo.header.stamp.fromSec( msg_vel2d.header.stamp.toSec() + cnt_odom_nonvel2d * node_config.cycle.value );
-					msg_gyrodo.x += (msg_vel2d.vel_x * cosv - msg_vel2d.vel_y * sinv) * node_config.cycle.value;
-					msg_gyrodo.y += (msg_vel2d.vel_x * sinv + msg_vel2d.vel_y * cosv) * node_config.cycle.value;
-					msg_gyrodo.theta += rate * node_config.cycle.value;
+					if( fabs(msg_gyrodo.header.stamp.toSec() - msg_vel2d.header.stamp.toSec() ) > msg_vel2d.measuring_period ) {
+						msg_gyrodo.header.stamp = msg_vel2d.header.stamp;
+					}
+					else {
+						msg_gyrodo.header.stamp.fromSec( msg_gyrodo.header.stamp.toSec() + msg_vel2d.measuring_period );
+					}
+
+					msg_gyrodo.x += (msg_vel2d.vel_x * cosv - msg_vel2d.vel_y * sinv) * msg_vel2d.measuring_period;
+					msg_gyrodo.y += (msg_vel2d.vel_x * sinv + msg_vel2d.vel_y * cosv) * msg_vel2d.measuring_period;
+					msg_gyrodo.theta += rate * msg_vel2d.measuring_period;
 
 					// publish
 					pub_gyrodo.publish(msg_gyrodo);
-					cnt_odom_nonvel2d++;
 
 					if( fp_textlog ) {
 						fprintf(fp_textlog, "%lf %lf %lf %lf %lf\n", time_current - time_start, msg_gyrodo.x, msg_gyrodo.y, msg_gyrodo.theta, offset_rate );
 					}
 
-					// update period
-					time_gyrodom = gnd_loop_next(time_current, time_start, node_config.cycle.value);
-
 				} // <--- pose calculation
-			}
-			// <--- calculate 2d pose
+			} // <--- read velocity
 
 			// ---> show status
-			if( node_config.cycle_cui_status_display.value > 0 && time_current > time_display ) {
+			if( node_config.period_cui_status_display.value > 0 && time_current > time_display ) {
 				msg_imu_t ws;
 
 				if( nline_display ) {
@@ -316,21 +304,21 @@ int main(int argc, char *argv[]) {
 				nline_display++; ::fprintf(stderr, "\x1b[K                :        value %8.03lf[m], %8.03lf[m], %6.01lf[deg]\n",
 						msg_gyrodo.x, msg_gyrodo.y, gnd_ang2deg( msg_gyrodo.theta ) );
 				nline_display++; ::fprintf(stderr, "\x1b[K                :      publish %.01lf [Hz]\n",
-						(double) (msg_gyrodo.header.seq - seq_gyrodo_prevdisp) / node_config.cycle_cui_status_display.value );
+						(double) (msg_gyrodo.header.seq - seq_gyrodo_prevdisp) / node_config.period_cui_status_display.value );
 				seq_gyrodo_prevdisp = msg_gyrodo.header.seq;
 				// velocity (subscribe)
 				nline_display++; ::fprintf(stderr, "\x1b[K       velocity :   topic name \"%s\" (subscribe)\n", node_config.topic_name_vel2d.value);
 				nline_display++; ::fprintf(stderr, "\x1b[K                :        value %5.02lf[m/s], %4.02lf[m/s], %4.01lf[deg/s]\n",
 						msg_vel2d.vel_x, msg_vel2d.vel_y, gnd_ang2deg( msg_vel2d.vel_ang ) );
 				nline_display++; ::fprintf(stderr, "\x1b[K                :    subscribe %.01lf [Hz]\n",
-						(double) (msg_vel2d.header.seq - seq_vel2d_prevdisp) / node_config.cycle_cui_status_display.value );
+						(double) (msg_vel2d.header.seq - seq_vel2d_prevdisp) / node_config.period_cui_status_display.value );
 				seq_vel2d_prevdisp = msg_vel2d.header.seq;
 				// imu (subscribe)
 				msgreader_imu.copy_latest(&ws);
 				nline_display++; ::fprintf(stderr, "\x1b[K    gyro sensor :   topic name \"%s\" (subscribe)\n", node_config.topic_name_imu.value);
 				nline_display++; ::fprintf(stderr, "\x1b[K                :     yaw rate %4.01lf[deg/s], offset corrected %4.01lf[deg/s]\n", gnd_ang2deg( -ws.Gyro.z ),  gnd_ang2deg( -ws.Gyro.z - offset_rate ) );
 				nline_display++; ::fprintf(stderr, "\x1b[K                :    subscribe %.01lf [Hz]\n",
-						(double) (ws.header.seq - seq_imu_prevdisp) / node_config.cycle_cui_status_display.value );
+						(double) (ws.header.seq - seq_imu_prevdisp) / node_config.period_cui_status_display.value );
 				seq_imu_prevdisp = ws.header.seq;
 				nline_display++; ::fprintf(stderr, "\x1b[K                :  rate offset %6.04lf\n", offset_rate );
 				// data association
@@ -339,12 +327,11 @@ int main(int argc, char *argv[]) {
 				nline_display++; ::fprintf(stderr, "\x1b[K\n");
 
 				// update
-				time_display = gnd_loop_next(time_current, time_start, node_config.cycle_cui_status_display.value );
+				time_display = gnd_loop_next(time_current, time_start, node_config.period_cui_status_display.value );
 
 			} // <--- show status
 
 		} // <--- main loop
-		spinner.stop();
 
 	} // <--- operation
 

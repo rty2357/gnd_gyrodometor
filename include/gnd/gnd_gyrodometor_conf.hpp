@@ -16,7 +16,7 @@
 
 // ---> type declaration
 namespace gnd {
-	namespace gyrodometry {
+	namespace gyrodometor {
 		struct node_config;
 		typedef struct node_config node_config;
 
@@ -30,10 +30,10 @@ namespace gnd {
 
 // ---> const variables definition
 namespace gnd {
-	namespace gyrodometry {
+	namespace gyrodometor {
 		static const param_string_t Default_node_name = {
 				"node-name",
-				"gnd_gyrodometry_node",
+				"gyrodometor",
 				"ros-node name"
 		};
 
@@ -55,9 +55,9 @@ namespace gnd {
 				"gyrodometry(pose2d) topic name (publish)"
 		};
 
-		static const param_double_t Default_cycle = {
-				"cycle",
-				gnd_msec2sec(5),
+		static const param_double_t Default_period = {
+				"period",
+				gnd_msec2sec(10),
 				"position estimation cycle [sec]"
 		};
 
@@ -79,10 +79,10 @@ namespace gnd {
 				"offset calibration start after this time from robot stopped"
 		};
 
-		static const param_double_t Default_cycle_cui_status_display = {
-				"cycle-cui-status-display",
+		static const param_double_t Default_period_cui_status_display = {
+				"period-cui-status-display",
 				0,
-				"cycle to display the node status in standard output [msec]. [note] it need ansi color code. [note] if this value is less than or equal 0, don't display"
+				"period to display the node status in standard output [msec]. [note] it need ansi color code. [note] if this value is less than or equal 0, don't display"
 		};
 		// ---> debug condition
 
@@ -101,7 +101,7 @@ namespace gnd {
 
 // ---> function declaration
 namespace gnd {
-	namespace gyrodometry {
+	namespace gyrodometor {
 		/**
 		 * @brief initialize configure to default parameter
 		 * @param [out] p : node_config
@@ -145,7 +145,7 @@ namespace gnd {
 
 // ---> type definition
 namespace gnd {
-	namespace gyrodometry {
+	namespace gyrodometor {
 		/**
 		 * \brief configuration parameter for gnd_gyrodometry node
 		 */
@@ -159,14 +159,13 @@ namespace gnd {
 			param_string_t	topic_name_gyrodom;					///< gyrodometory topic name
 
 			// position estimation config
-			param_double_t	cycle;								///< position estimation cycle
 			param_double_t	offset_calibration_default;			///< offset calibration option
 			param_double_t	offset_calibration_time_margin;		///< offset calibration option
 			param_double_t	offset_calibration_factor;			///< offset calibration option
 
 			// debug option
 			param_string_t	gyrodometry_log;					///< gyrodometory topic name
-			param_double_t	cycle_cui_status_display;			///< cui status display mode
+			param_double_t	period_cui_status_display;			///< cui status display mode
 		};
 
 		inline
@@ -182,7 +181,7 @@ namespace gnd {
 
 // ---> function definition
 namespace gnd {
-	namespace gyrodometry {
+	namespace gyrodometor {
 		/*
 		 * \brief initialize configuration parameter
 		 * @param [out] p : node_config
@@ -197,13 +196,12 @@ namespace gnd {
 			memcpy( &p->topic_name_vel2d,				&Default_topic_name_vel2d,					sizeof(Default_topic_name_vel2d) );
 			memcpy( &p->topic_name_gyrodom,				&Default_topic_name_gyrodometry,			sizeof(Default_topic_name_gyrodometry) );
 			// position estimation
-			memcpy( &p->cycle,							&Default_cycle,								sizeof(Default_cycle) );
 			memcpy( &p->offset_calibration_default,		&Default_offset_calibration_default,		sizeof(Default_offset_calibration_default) );
 			memcpy( &p->offset_calibration_factor,		&Default_offset_calibration_factor,			sizeof(Default_offset_calibration_factor) );
 			memcpy( &p->offset_calibration_time_margin,	&Default_offset_calibration_time_margin,	sizeof(Default_offset_calibration_time_margin) );
 			// debug option
 			memcpy( &p->gyrodometry_log,				&Default_gyrodometry_log,					sizeof(Default_gyrodometry_log) );
-			memcpy( &p->cycle_cui_status_display,		&Default_cycle_cui_status_display,			sizeof(Default_cycle_cui_status_display) );
+			memcpy( &p->period_cui_status_display,		&Default_period_cui_status_display,			sizeof(Default_period_cui_status_display) );
 
 			return 0;
 		}
@@ -243,13 +241,12 @@ namespace gnd {
 			gnd::conf::get_parameter( src, &dest->topic_name_vel2d );
 			gnd::conf::get_parameter( src, &dest->topic_name_gyrodom );
 			// position estimation
-			gnd::conf::get_parameter( src, &dest->cycle );
 			gnd::conf::get_parameter( src, &dest->offset_calibration_default );
 			gnd::conf::get_parameter( src, &dest->offset_calibration_factor );
 			gnd::conf::get_parameter( src, &dest->offset_calibration_time_margin );
 			// debug option
 			gnd::conf::get_parameter( src, &dest->gyrodometry_log );
-			gnd::conf::get_parameter( src, &dest->cycle_cui_status_display );
+			gnd::conf::get_parameter( src, &dest->period_cui_status_display );
 			return 0;
 		}
 
@@ -290,13 +287,12 @@ namespace gnd {
 			gnd::conf::set_parameter(dest, &src->topic_name_vel2d );
 			gnd::conf::set_parameter(dest, &src->topic_name_gyrodom );
 			// position estimation
-			gnd::conf::set_parameter(dest, &src->cycle );
 			gnd::conf::set_parameter(dest, &src->offset_calibration_default );
 			gnd::conf::set_parameter(dest, &src->offset_calibration_factor );
 			gnd::conf::set_parameter(dest, &src->offset_calibration_time_margin );
 			// debug option
 			gnd::conf::set_parameter(dest, &src->gyrodometry_log );
-			gnd::conf::set_parameter(dest, &src->cycle_cui_status_display );
+			gnd::conf::set_parameter(dest, &src->period_cui_status_display );
 
 			return 0;
 		}
