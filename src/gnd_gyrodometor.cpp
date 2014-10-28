@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
 			time_current = ros::Time::now().toSec();
 			time_start = time_current;
 			time_gyrodom = time_start;
-			time_vehiclestop = time_start;
+			time_vehiclestop = 0.0;
 			time_display = time_start;
 		} // <--- time initialize
 
@@ -240,9 +240,10 @@ int main(int argc, char *argv[]) {
 					// todo : sensor pose configuration
 					// not moving in wheel odometry data
 					if( msg_vel2d.vel_x == 0 && msg_vel2d.vel_y == 0 && msg_vel2d.vel_ang == 0 &&
-							fabs(msg_imu.Gyro.z - offset_rate) < gnd_deg2ang(2.0) ) {
+						fabs( (-msg_imu.Gyro.z) - offset_rate ) < gnd_deg2ang(0.5) ) {
 						msg_imu_t ws;
 
+						rate = 0;
 						if( msg_vel2d.header.stamp.toSec() - time_vehiclestop > node_config.offset_calibration_time_margin.value * 2.0
 								&& msgreader_imu.copy_at_time(&ws, msg_vel2d.header.stamp.toSec() - node_config.offset_calibration_time_margin.value) == 0 ) {
 							// update offset
@@ -253,10 +254,6 @@ int main(int argc, char *argv[]) {
 								offset_rate += ( (-ws.Gyro.z) - offset_rate) * node_config.offset_calibration_factor.value;
 								seq_imu_prevoffsetupdate = ws.header.seq;
 							}
-							rate = 0;
-						}
-						else {
-							rate = (-msg_imu.Gyro.z) - offset_rate;
 						}
 					}
 					// moving
