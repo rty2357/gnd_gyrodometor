@@ -11,8 +11,8 @@
 #include "gnd/gnd_gyrodometor.hpp"
 #include "gnd/gnd_gyrodometor_conf.hpp"
 
-#include "gnd_geometry2d_msgs/msg_pose2d_stamped.h"
-#include "gnd_geometry2d_msgs/msg_velocity2d_with_covariance_stamped.h"
+#include "gnd_msgs/msg_pose2d_stamped.h"
+#include "gnd_msgs/msg_velocity2d_with_covariance_stamped.h"
 
 #include "vectornav/sensors.h"
 
@@ -24,8 +24,8 @@
 
 #include "ros/ros.h"
 
-typedef gnd_geometry2d_msgs::msg_pose2d_stamped							msg_pose2d_t;
-typedef gnd_geometry2d_msgs::msg_velocity2d_with_covariance_stamped		msg_vel2d_t;
+typedef gnd_msgs::msg_pose2d_stamped									msg_pose2d_t;
+typedef gnd_msgs::msg_velocity2d_with_covariance_stamped				msg_vel2d_t;
 typedef vectornav::sensors												msg_imu_t;
 typedef gnd::rosutil::rosmsgs_reader_stamped<msg_vel2d_t>				msgreader_vel2d_t;
 typedef gnd::rosutil::rosmsgs_reader_stamped<msg_imu_t>					msgreader_imu_t;
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
 				ros::shutdown();
 			}
 			else {
-				pub_gyrodo = nodehandle.advertise<gnd_geometry2d_msgs::msg_pose2d_stamped>(node_config.topic_name_gyrodom.value, 1000);
+				pub_gyrodo = nodehandle.advertise<gnd_msgs::msg_pose2d_stamped>(node_config.topic_name_gyrodom.value, 1000);
 
 				msg_gyrodo.x = 0;
 				msg_gyrodo.y = 0;

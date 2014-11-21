@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   geometry_msgs
   vectornav
-  gnd_geometry2d_msgs
+  gnd_msgs
   gnd_rosutil
   gndlib
 )
