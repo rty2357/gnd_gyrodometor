@@ -73,6 +73,12 @@ namespace gnd {
 				"offset calibration factor"
 		};
 
+		static const param_double_t Default_offset_calibration_threshold = {
+				"offset-calibration-threshold",
+				0.5,
+				"if gyro-sensor readings(rate absolute value) is greater than this, offset calibration ignore the readings"
+		};
+
 		static const param_double_t Default_offset_calibration_time_margin = {
 				"offset-calibration-time-margin",
 				0.1,
@@ -162,6 +168,7 @@ namespace gnd {
 			param_double_t	offset_calibration_default;			///< offset calibration option
 			param_double_t	offset_calibration_time_margin;		///< offset calibration option
 			param_double_t	offset_calibration_factor;			///< offset calibration option
+			param_double_t  offset_calibration_threshold;		///< offset calibration threshold
 
 			// debug option
 			param_string_t	gyrodometry_log;					///< gyrodometory topic name
@@ -199,6 +206,8 @@ namespace gnd {
 			memcpy( &p->offset_calibration_default,		&Default_offset_calibration_default,		sizeof(Default_offset_calibration_default) );
 			memcpy( &p->offset_calibration_factor,		&Default_offset_calibration_factor,			sizeof(Default_offset_calibration_factor) );
 			memcpy( &p->offset_calibration_time_margin,	&Default_offset_calibration_time_margin,	sizeof(Default_offset_calibration_time_margin) );
+			memcpy( &p->offset_calibration_threshold,	&Default_offset_calibration_threshold,		sizeof(Default_offset_calibration_threshold) );
+
 			// debug option
 			memcpy( &p->gyrodometry_log,				&Default_gyrodometry_log,					sizeof(Default_gyrodometry_log) );
 			memcpy( &p->period_cui_status_display,		&Default_period_cui_status_display,			sizeof(Default_period_cui_status_display) );
@@ -244,6 +253,7 @@ namespace gnd {
 			gnd::conf::get_parameter( src, &dest->offset_calibration_default );
 			gnd::conf::get_parameter( src, &dest->offset_calibration_factor );
 			gnd::conf::get_parameter( src, &dest->offset_calibration_time_margin );
+			gnd::conf::get_parameter( src, &dest->offset_calibration_threshold );
 			// debug option
 			gnd::conf::get_parameter( src, &dest->gyrodometry_log );
 			gnd::conf::get_parameter( src, &dest->period_cui_status_display );
@@ -290,6 +300,7 @@ namespace gnd {
 			gnd::conf::set_parameter(dest, &src->offset_calibration_default );
 			gnd::conf::set_parameter(dest, &src->offset_calibration_factor );
 			gnd::conf::set_parameter(dest, &src->offset_calibration_time_margin );
+			gnd::conf::set_parameter(dest, &src->offset_calibration_threshold );
 			// debug option
 			gnd::conf::set_parameter(dest, &src->gyrodometry_log );
 			gnd::conf::set_parameter(dest, &src->period_cui_status_display );

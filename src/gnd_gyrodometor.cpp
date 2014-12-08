@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
 					// todo : sensor pose configuration
 					// not moving in wheel odometry data
 					if( msg_vel2d.vel_x == 0 && msg_vel2d.vel_y == 0 && msg_vel2d.vel_ang == 0 &&
-						fabs( (-msg_imu.Gyro.z) - offset_rate ) < gnd_deg2ang(0.5) ) {
+						fabs( (-msg_imu.Gyro.z) - offset_rate ) < gnd_deg2ang(node_config.offset_calibration_threshold.value) ) {
 						msg_imu_t ws;
 
 						rate = 0;
