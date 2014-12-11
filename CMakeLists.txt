@@ -85,7 +85,7 @@ add_executable(gnd_gyrodometor     src/gnd_gyrodometor.cpp )
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(vectornav_node vectornav_generate_messages_cpp)
+add_dependencies(gnd_gyrodometor vectornav_generate_messages_cpp gnd_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(gnd_gyrodometor
